@@ -1,0 +1,26 @@
+version: 2
+
+models:
+  - name: avg_order_value
+    description: Average order value per customer.
+    columns:
+      - name: customer_name
+        description: The customer name.
+      - name: lifetime_orders
+        description: The total number of orders placed by that customer.
+      - name: lifetime_spend_usd
+        description: The total dollar amount of all orders placed by that customer.
+      - name: avg_order_value_usd
+        description: The average order value placed by that customer.
+
+  - name: sum_revenue_per_city
+    description: Total revenue, orders and customers per city.
+    columns:
+      - name: location_name
+        description: The city name.
+      - name: revenue_usd
+        description: The total revenue for that city.
+      - name: nr_orders
+        description: The total number of orders placed in that city.
+      - name: nr_customers
+        description: The total number of customers in that city.

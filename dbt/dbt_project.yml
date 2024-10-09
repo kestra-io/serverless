@@ -1,0 +1,27 @@
+name: dwh
+profile: bigquery
+config-version: 2
+version: '1.0.0'
+analysis-paths: ["analyses"]
+clean-targets: # dbt clean
+  - "target"
+  - "logs"
+  - "dbt_packages"
+macro-paths: ["macros"]
+model-paths: ["models"]
+seed-paths: ["seeds"]
+snapshot-paths: ["snapshots"]
+test-paths: ["tests"]
+packages-install-path: "dbt_packages"
+vars:
+  truncate_timespan_to: '2026-01-01' # "{{ current_timestamp() }}"
+models:
+  dwh:
+    staging:
+      +materialized: table # could be view
+    marts:
+      +materialized: table
+    aggregations:
+      +materialized: table
+flags:
+  send_anonymous_usage_stats: False

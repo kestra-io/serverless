@@ -1,0 +1,14 @@
+bigquery:
+  outputs:
+    prod:
+      type: bigquery
+      dataset: "{{ env_var('DBT_SCHEMA', 'dwh') }}"
+      project: "{{ env_var('DBT_DATABASE', 'geller') }}"
+      keyfile: "{{ env_var('GOOGLE_APPLICATION_CREDENTIALS', 'sa.json') }}"
+      location: EU
+      method: service-account
+      priority: interactive
+      threads: 16
+      timeout_seconds: 300
+      fixed_retries: 1
+  target: prod

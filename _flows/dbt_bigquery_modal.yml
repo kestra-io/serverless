@@ -1,0 +1,272 @@
+id: dbt_bigquery_modal
+namespace: company.team
+
+inputs:
+  - id: gcp_project
+    displayName: GCP Project ID
+    description: The ID of the GCP project
+    type: STRING
+    defaults: geller
+
+  - id: gcs_bucket
+    displayName: GCS Bucket
+    description: Name of the GCS bucket to upload files
+    type: STRING
+    defaults: kestraio
+
+  - id: tbl_name
+    displayName: Forecast table
+    description: Where to store the final sales forecast table from ML task
+    type: STRING
+    defaults: forecast
+
+  - id: run_ingestion
+    displayName: Run ingestion
+    description: Whether to run the ingestion
+    type: BOOLEAN
+    defaults: true
+
+  - id: run_modal
+    displayName: Run forecasts on Modal
+    description: Whether to run the forecast on Modal
+    type: BOOLEAN
+    defaults: true
+
+  - id: dataset_url
+    displayName: Data lake URL to the dataset used for the ML model
+    description: Swap the `jaffle-parquet` to `jaffle-large` in the URL to test the flow with a larger, more realistic dataset
+    type: STRING
+    defaults: "https://huggingface.co/datasets/kestra/datasets/resolve/main/jaffle-parquet"
+    dependsOn:
+      inputs:
+        - run_modal
+      condition: "{{ inputs.run_modal equals true }}"
+
+  - id: cpu
+    type: SELECT
+    displayName: CPU request
+    description: The number of CPU cores to allocate to the job
+    defaults: "0.25"
+    values: ["0.25", "0.5", "0.75", "1.0", "1.5", "2.0", "4.0", "8.0", "16.0", "32.0"]
+    dependsOn:
+      inputs:
+        - run_modal
+      condition: "{{ inputs.run_modal equals true }}"
+
+  - id: memory
+    type: SELECT
+    displayName: Memory
+    description: Amount of memory in MiB
+    defaults: 256
+    values: ["256", "512", "1024", "2048", "4096", "8192", "16384", "32768"]
+    dependsOn:
+      inputs:
+        - run_modal
+      condition: "{{ inputs.run_modal equals true }}"
+
+  - id: customize_forecast
+    displayName: Customize forecast parameters
+    description: Whether to customize the visualization and final artifact names
+    type: BOOLEAN
+    defaults: false
+
+  - id: forecast_file
+    displayName: Forecast file name
+    description: Name of the forecast output file that will be stored in S3
+    type: STRING
+    defaults: forecast.parquet
+    dependsOn:
+      inputs:
+        - run_modal
+        - customize_forecast
+      condition: "{{ inputs.run_modal equals true and inputs.customize_forecast equals true }}"
+
+  - id: html_report
+    displayName: HTML report file name
+    description: Name of the HTML report that you can download from the Outputs tab in the Kestra UI
+    type: STRING
+    defaults: forecast.html
+    dependsOn:
+      inputs:
+        - run_modal
+        - customize_forecast
+      condition: "{{ inputs.run_modal equals true and inputs.customize_forecast equals true }}"
+
+  - id: color_history
+    displayName: Time series color for historical data
+    description: Color for historical data in the plot
+    type: STRING
+    defaults: blue
+    dependsOn:
+      inputs:
+        - run_modal
+        - customize_forecast
+      condition: "{{ inputs.run_modal equals true and inputs.customize_forecast equals true }}"
+
+  - id: color_prediction
+    displayName: Time series color for forecasted data
+    description: Color for predicted data in the plot
+    type: STRING
+    defaults: red
+    dependsOn:
+      inputs:
+        - run_modal
+        - customize_forecast
+      condition: "{{ inputs.run_modal equals true and inputs.customize_forecast equals true }}"
+
+  - id: nr_days_fcst
+    displayName: Forecast days
+    description: The number of days in the future to generate forecast for
+    type: INT
+    defaults: 180
+    dependsOn:
+      inputs:
+        - run_modal
+        - customize_forecast
+      condition: "{{ inputs.run_modal equals true and inputs.customize_forecast equals true }}"
+
+tasks:
+  - id: whether_to_run_ingestion
+    type: io.kestra.plugin.core.flow.If
+    condition: "{{ inputs.run_ingestion }}"
+    then:
+      - id: extract_and_load
+        type: io.kestra.plugin.core.flow.Parallel
+        tasks:
+          - id: ingest_raw_customers
+            type: io.kestra.plugin.core.flow.Sequential
+            tasks:
+              - id: raw_customers
+                type: io.kestra.plugin.core.http.Download
+                uri: "{{inputs.dataset_url}}/{{task.id}}.parquet"
+
+              - id: raw_customers_load
+                type: io.kestra.plugin.gcp.bigquery.Load
+                from: "{{ outputs.raw_customers.uri}}"
+                destinationTable: "{{ inputs.gcp_project ~ '.dwh.raw_customers' }}"
+
+          - id: ingest_raw_items
+            type: io.kestra.plugin.core.flow.Sequential
+            tasks:
+              - id: raw_items
+                type: io.kestra.plugin.core.http.Download
+                uri: "{{inputs.dataset_url}}/{{task.id}}.parquet"
+
+              - id: raw_items_load
+                type: io.kestra.plugin.gcp.bigquery.Load
+                from: "{{ outputs.raw_items.uri}}"
+                destinationTable: "{{ inputs.gcp_project ~ '.dwh.raw_items' }}"
+
+          - id: ingest_raw_orders
+            type: io.kestra.plugin.core.flow.Sequential
+            tasks:
+              - id: raw_orders
+                type: io.kestra.plugin.core.http.Download
+                uri: "{{inputs.dataset_url}}/{{task.id}}.parquet"
+
+              - id: raw_orders_load
+                type: io.kestra.plugin.gcp.bigquery.Load
+                from: "{{ outputs.raw_orders.uri}}"
+                destinationTable: "{{ inputs.gcp_project ~ '.dwh.raw_orders' }}"
+
+          - id: ingest_raw_products
+            type: io.kestra.plugin.core.flow.Sequential
+            tasks:
+              - id: raw_products
+                type: io.kestra.plugin.core.http.Download
+                uri: "{{inputs.dataset_url}}/{{task.id}}.parquet"
+
+              - id: raw_products_load
+                type: io.kestra.plugin.gcp.bigquery.Load
+                from: "{{ outputs.raw_products.uri}}"
+                destinationTable: "{{ inputs.gcp_project ~ '.dwh.raw_products' }}"
+
+          - id: ingest_raw_stores
+            type: io.kestra.plugin.core.flow.Sequential
+            tasks:
+              - id: raw_stores
+                type: io.kestra.plugin.core.http.Download
+                uri: "{{inputs.dataset_url}}/{{task.id}}.parquet"
+
+              - id: raw_stores_load
+                type: io.kestra.plugin.gcp.bigquery.Load
+                from: "{{ outputs.raw_stores.uri}}"
+                destinationTable: "{{ inputs.gcp_project ~ '.dwh.raw_stores' }}"
+
+          - id: ingest_raw_supplies
+            type: io.kestra.plugin.core.flow.Sequential
+            tasks:
+              - id: raw_supplies
+                type: io.kestra.plugin.core.http.Download
+                uri: "{{inputs.dataset_url}}/{{task.id}}.parquet"
+
+              - id: raw_supplies_load
+                type: io.kestra.plugin.gcp.bigquery.Load
+                from: "{{ outputs.raw_supplies.uri}}"
+                destinationTable: "{{ inputs.gcp_project ~ '.dwh.raw_supplies' }}"
+
+  - id: wdir
+    type: io.kestra.plugin.core.flow.WorkingDirectory
+    tasks:
+      - id: git
+        type: io.kestra.plugin.git.Clone
+        url: https://github.com/kestra-io/serverless
+        branch: main
+
+      - id: dbt_build
+        type: io.kestra.plugin.dbt.cli.DbtCLI
+        inputFiles:
+          sa.json: "{{ kv('GCP_CREDS') }}"
+        outputFiles:
+          - "manifest.json"
+        taskRunner:
+          type: io.kestra.plugin.scripts.runner.docker.Docker
+        containerImage: ghcr.io/kestra-io/dbt-bigquery:latest
+        projectDir: dbt
+        commands:
+          - dbt deps --project-dir dbt
+          - dbt build --project-dir dbt
+        env:
+          DBT_DATABASE: "{{ inputs.gcp_project }}"
+          DBT_SCHEMA: dwh
+          GOOGLE_APPLICATION_CREDENTIALS: sa.json
+
+      - id: save_manifest
+        type: io.kestra.plugin.core.kv.Set
+        key: manifest
+        value: "{{ read(outputs.dbt_build.outputFiles['manifest.json']) }}"
+        kvType: JSON
+
+      - id: ml_forecast
+        type: io.kestra.plugin.modal.cli.ModalCLI
+        namespaceFiles:
+          enabled: true
+        commands:
+          - modal run ml/forecast.py --forecast-file "{{ inputs.forecast_file }}" --html-report "{{ inputs.html_report }}" --gcs-bucket "{{ inputs.gcs_bucket }}" --nr-days-fcst "{{ inputs.nr_days_fcst }}"  --color-history {{inputs.color_history}} --color-prediction {{inputs.color_prediction}}
+        env:
+          MODAL_TOKEN_ID: "{{ kv('MODAL_TOKEN_ID') }}"
+          MODAL_TOKEN_SECRET: "{{ kv('MODAL_TOKEN_SECRET') }}"
+          CPU: "{{ inputs.cpu }}"
+          MEMORY: "{{ inputs.memory }}"
+
+      - id: get_report_gcs
+        type: io.kestra.plugin.gcp.gcs.Download
+        from: "gs://{{ inputs.gcs_bucket }}/{{ inputs.html_report }}"
+        serviceAccount: "{{ kv('GCP_CREDS') }}"
+        projectId: "{{ inputs.gcp_project }}"
+
+      - id: fcst_gsc_to_bq
+        type: io.kestra.plugin.gcp.bigquery.LoadFromGcs
+        from:
+          - "gs://{{ inputs.gcs_bucket }}/{{ inputs.forecast_file }}"
+        destinationTable: "{{ inputs.gcp_project }}.dwh.{{inputs.tbl_name}}"
+        format: PARQUET
+        writeDisposition: WRITE_TRUNCATE
+
+pluginDefaults:
+  - type: io.kestra.plugin.gcp.bigquery.Load
+    values:
+      format: PARQUET
+      serviceAccount: "{{ kv('GCP_CREDS') }}"
+      projectId: "{{ inputs.gcp_project }}"
+      writeDisposition: WRITE_TRUNCATE
