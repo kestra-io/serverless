@@ -1,6 +1,10 @@
 # Serverless Data Pipelines with Kestra, Modal and dbt
 
+Click on the image to see the workflow in action (YouTube link):
+
 [![YouTube Video](images/thumbnail.jpg)](https://www.youtube.com/watch?v=Wqz7CZudqNo)
+
+**Companion blog post:** [link](https://kestra.io/blogs/serverless-data-pipelines)
 
 This project integrates [Kestra](https://kestra.io/) with [dbt](https://www.getdbt.com/) and [Modal](https://modal.com/) to showcase a serverless data transformation project. 
 
@@ -8,6 +12,12 @@ The project is inspired by the [jaffle-shop-template](https://github.com/dbt-lab
 1. Make things even easier to reproduce  — you'll use exactly the same source data hosted with [HuggingFace Datasets](https://huggingface.co/datasets/kestra/datasets/tree/main/jaffle-parquet) rather than generating them randomly. 
 2. Make it work with any supported dbt-adapter, not only with DuckDB.
 3. Keeep things simple - we'll use a lightweight setup without complex data ingestion or BI tools
+
+## Architecture 
+
+The main goal of this project is to leverage serverless components where possible — hence e.g. BigQuery rather than Snowflake. 
+
+![serverless](images/serverless_flow.jpg)
 
 ## Getting Started
 
